@@ -6,17 +6,28 @@ class URL:
     def __init__(self, url):
         # example url
         # http://example.org/index.html
-        self.scheme, url = url.split("://", 1)
-
-        assert self.scheme in ["http", "https", "file"]
+        # http://example.org:8000/index.html
+        # https://example.org/index.html
         # file:///C:\Users\YeasirKhandaker\personal\browserEngineering\dummy\first.txt
-        # did not handle linux file system
-        # may need to convert \ to / later on if want to have uniform convention across windows and linux
+        # data:text/html,<h1>Hello world!</h1>
+        self.scheme, url = url.split(":", 1)
+
+        assert self.scheme in ["http", "https", "file", "data"]
+
+        if self.scheme == "data":
+            metadata, content = url.split(",", 1)
+            self.path = content
+            return
+        
         if self.scheme == "file":
-            if url[0] == "/":
-                url = url[1:]
+            url = url[3:]
             self.path = url
             return
+        
+        # assuming rest of the schemes follow "scheme://..." convention
+        # so stripping the first two slashes
+        url = url[2:]
+
         if self.scheme == "http":
             self.port = 80
         elif self.scheme == "https":
@@ -33,6 +44,9 @@ class URL:
         self.path = "/" + url
     
     def request(self):
+        if self.scheme == "data":
+            return self.path
+        
         if self.scheme == "file":
             with open(self.path, "r", encoding="utf-8") as f:
                 content = f.read()
