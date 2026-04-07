@@ -2,6 +2,9 @@ import socket
 import sys
 import ssl
 
+# (scheme, host, port): socket
+connections = {}
+
 class URL:
     def __init__(self, url):
         # example url
@@ -58,26 +61,34 @@ class URL:
                 content = f.read()
             return content
         
-        s = socket.socket(
-            family=socket.AF_INET,
-            type=socket.SOCK_STREAM,
-            proto=socket.IPPROTO_TCP
-        )
-        s.connect((self.host, self.port))
-        if self.scheme == "https":
-            ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
+        key = (self.scheme, self.host, self.port)
+        if key in connections:
+            s = connections[key]
+        else:
+            s = socket.socket(
+                family=socket.AF_INET,
+                type=socket.SOCK_STREAM,
+                proto=socket.IPPROTO_TCP
+            )
+            s.connect((self.host, self.port))
+
+            if self.scheme == "https":
+                ctx = ssl.create_default_context()
+                s = ctx.wrap_socket(s, server_hostname=self.host)
+            
+            connections[key] = s
 
         # example request
         # GET /index.html HTTP/1.1
         # HOST: example.org
-        # Connection: close
+        # Connection: keep-alive
         # User-Agent: demo-browser
         request = "GET {} HTTP/1.1\r\n".format(self.path)
         request += "HOST: {}\r\n".format(self.host)
-        request += "Connection: {}\r\n".format("close")
+        request += "Connection: {}\r\n".format("keep-alive")
         request += "User-Agent: {}\r\n".format("demo-browser")
         request += "\r\n"
+
         s.send(request.encode("utf8"))
 
         # example response
@@ -94,25 +105,53 @@ class URL:
         # X-Cache: HIT
         # Content-Length: 1270
         # Connection: close
-        response = s.makefile("r", encoding="utf8", newline="\r\n")
+        response = s.makefile("rb")
 
-        statusline = response.readline()
+        statusline = response.readline().decode("utf-8")
         version, status, explanation = statusline.split(" ", 2)
 
         response_headers = {}
         while True:
-            line = response.readline()
+            line = response.readline().decode("utf-8")
             if line == "\r\n": break
             header, value = line.split(":", 1)
             response_headers[header.casefold()] = value.strip()
         
-        assert "trasnfer-encoding" not in response_headers
         assert "content-encoding" not in response_headers
 
-        content = response.read()
-        s.close()
+        transfer_encoding = response_headers.get("transfer-encoding", "").lower()
+        content_length = int(response_headers.get("content-length", 0))
+        connection_header = response_headers.get("connection", "").lower()
+        
+        if transfer_encoding == "chunked":
+            body = b""
+            while True:
+                line = response.readline().decode("utf-8").strip()
+                chunk_size = int(line, 16)
+                
+                if chunk_size == 0:
+                    response.readline() # trailing CRLF after last chunk
+                    break
+                
+                chunk = response.read(chunk_size)
+                body += chunk
+                response.readline() # skip CRLF after chunk
+            content = body
+        elif content_length > 0:
+            content = response.read(content_length)
+        else:
+            content = response.read()
+            s.close()
+            connections.pop(key, None)
 
-        return content
+        if connection_header == "close":
+            s.close()
+            connections.pop(key, None)
+        
+        # REMOVE LATER
+        print(connections)
+
+        return content.decode("utf-8")
     
 def show(body, view_source=False):
     if view_source is True:
@@ -165,6 +204,9 @@ def load(url):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <url>")
+        # print(f"Usage: {sys.argv[0]} <url>")
+        for i in range(3):
+            load(URL("http://httpbin.org/anything"))
+        load(URL("http://example.org"))
         sys.exit(1)
     load(URL(sys.argv[1]))
