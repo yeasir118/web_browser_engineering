@@ -1,9 +1,13 @@
 import socket
 import sys
 import ssl
+import time
 
 # (scheme, host, port): socket
 connections = {}
+
+# (scheme, host, port): (content, max_age, cache_time)
+cache = {}
 
 MAX_ALLOWED_REDIRECTS = 3
 
@@ -69,6 +73,21 @@ class URL:
                 content = f.read()
             return content
         
+        if cache.get((self.scheme, self.host, self.port)):
+            content, max_age, cache_time = cache.get((self.scheme, self.host, self.port))
+
+            if max_age == "-1":
+                return content
+            
+            max_age = int(max_age)
+
+            current_time = time.time()
+            cache_age = current_time - cache_time
+
+            if cache_age <= max_age:
+                print("Cache hit")
+                return content
+        
         key = (self.scheme, self.host, self.port)
         if key in connections:
             s = connections[key]
@@ -127,6 +146,16 @@ class URL:
         
         assert "content-encoding" not in response_headers
 
+        cache_control_directives = {}
+        if "cache-control" in response_headers:
+            directives = response_headers.get("cache-control").split(",")
+            for directive in directives:
+                if "=" in directive:
+                    key, value = directive.split("=")
+                    cache_control_directives[key.lower().strip()] = value.lower().strip()
+                else:
+                    cache_control_directives[directive.lower().strip()] = True
+
         # Redirection
         if int(int(status)/100) == 3:
             print(f"Redirect: {self.remaining_redirects}")
@@ -169,10 +198,13 @@ class URL:
             s.close()
             connections.pop(key, None)
         
-        # REMOVE LATER
-        print(connections)
+        content = content.decode("utf-8")
 
-        return content.decode("utf-8")
+        if "no-store" not in cache_control_directives:
+            current_time = time.time()
+            cache[(self.scheme, self.host, self.port)] = (content, cache_control_directives.get("max-age", "-1"), current_time)
+
+        return content
     
 def show(body, view_source=False):
     if view_source is True:
@@ -226,9 +258,11 @@ def load(url):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         # print(f"Usage: {sys.argv[0]} <url>")
+        # for i in range(3):
+        #     load(URL("http://httpbin.org/anything"))
+        # load(URL("http://example.org"))
+        # load(URL("http://httpbin.org/stream/3"))
         for i in range(3):
-            load(URL("http://httpbin.org/anything"))
-        load(URL("http://example.org"))
-        load(URL("http://httpbin.org/stream/3"))
+            load(URL("http://example.org"))
         sys.exit(1)
     load(URL(sys.argv[1]))
