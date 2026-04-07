@@ -8,7 +8,15 @@ class URL:
         # http://example.org/index.html
         self.scheme, url = url.split("://", 1)
 
-        assert self.scheme in ["http", "https"]
+        assert self.scheme in ["http", "https", "file"]
+        # file:///C:\Users\YeasirKhandaker\personal\browserEngineering\dummy\first.txt
+        # did not handle linux file system
+        # may need to convert \ to / later on if want to have uniform convention across windows and linux
+        if self.scheme == "file":
+            if url[0] == "/":
+                url = url[1:]
+            self.path = url
+            return
         if self.scheme == "http":
             self.port = 80
         elif self.scheme == "https":
@@ -25,6 +33,11 @@ class URL:
         self.path = "/" + url
     
     def request(self):
+        if self.scheme == "file":
+            with open(self.path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return content
+        
         s = socket.socket(
             family=socket.AF_INET,
             type=socket.SOCK_STREAM,
