@@ -5,8 +5,12 @@ import ssl
 # (scheme, host, port): socket
 connections = {}
 
+MAX_ALLOWED_REDIRECTS = 3
+
 class URL:
-    def __init__(self, url):
+    def __init__(self, url, remaining_redirects=MAX_ALLOWED_REDIRECTS):
+        self.remaining_redirects = remaining_redirects
+        
         # example url
         # http://example.org/index.html
         # http://example.org:8000/index.html
@@ -53,6 +57,10 @@ class URL:
         self.path = "/" + url
     
     def request(self):
+        if self.remaining_redirects < 0:
+            print(f"MAX NUMBER OF REDIRECTIONS EXCEEDED")
+            return ""
+        
         if self.scheme == "data":
             return self.path
         
@@ -118,6 +126,19 @@ class URL:
             response_headers[header.casefold()] = value.strip()
         
         assert "content-encoding" not in response_headers
+
+        # Redirection
+        if int(int(status)/100) == 3:
+            print(f"Redirect: {self.remaining_redirects}")
+            
+            redirect_location = response_headers.get("location", "")
+            
+            if redirect_location.startswith("/"):
+                redirect_location = f"{self.scheme}://{self.host}{redirect_location}"
+            
+            load(URL(redirect_location, remaining_redirects=self.remaining_redirects-1))
+            
+            return ""
 
         transfer_encoding = response_headers.get("transfer-encoding", "").lower()
         content_length = int(response_headers.get("content-length", 0))
@@ -208,5 +229,6 @@ if __name__ == "__main__":
         for i in range(3):
             load(URL("http://httpbin.org/anything"))
         load(URL("http://example.org"))
+        load(URL("http://httpbin.org/stream/3"))
         sys.exit(1)
     load(URL(sys.argv[1]))
