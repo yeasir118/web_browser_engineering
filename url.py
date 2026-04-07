@@ -110,13 +110,43 @@ class URL:
     
 def show(body):
     in_tag = False
-    for c in body:
+    i = 0
+
+    while i < len(body):
+        c = body[i]
         if c == "<":
             in_tag = True
+            i += 1
         elif c == ">":
             in_tag = False
+            i += 1
+        elif c == "&":
+            j = i
+            content = ""
+
+            while j < len(body) and body[j] != ";":
+                content += body[j]
+                j += 1
+            
+            if j < len(body):
+                content += ";"
+
+                if content == "&lt;":
+                    print("<", end="")
+                elif content == "&gt;":
+                    print(">", end="")
+                else:
+                    print(content, end="")
+                
+                i = j + 1
+            else:
+                print(c, end="")
+                i += 1
         elif not in_tag:
             print(c, end="")
+            i += 1
+        else:
+            i += 1
 
 def load(url):
     body = url.request()
