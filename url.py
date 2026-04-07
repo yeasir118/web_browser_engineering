@@ -10,9 +10,11 @@ class URL:
         # https://example.org/index.html
         # file:///C:\Users\YeasirKhandaker\personal\browserEngineering\dummy\first.txt
         # data:text/html,<h1>Hello world!</h1>
+        # view-source:http://example.org
         self.scheme, url = url.split(":", 1)
+        self.view_source = False
 
-        assert self.scheme in ["http", "https", "file", "data"]
+        assert self.scheme in ["http", "https", "file", "data", "view-source"]
 
         if self.scheme == "data":
             metadata, content = url.split(",", 1)
@@ -23,6 +25,10 @@ class URL:
             url = url[3:]
             self.path = url
             return
+        
+        if self.scheme == "view-source":
+            self.view_source = True
+            self.scheme, url = url.split(":", 1)
         
         # assuming rest of the schemes follow "scheme://..." convention
         # so stripping the first two slashes
@@ -108,7 +114,12 @@ class URL:
 
         return content
     
-def show(body):
+def show(body, view_source=False):
+    if view_source is True:
+        for c in body:
+            print(c, end="")
+        return
+
     in_tag = False
     i = 0
 
@@ -150,7 +161,7 @@ def show(body):
 
 def load(url):
     body = url.request()
-    show(body)
+    show(body, url.view_source)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
