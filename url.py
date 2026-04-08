@@ -2,6 +2,7 @@ import socket
 import sys
 import ssl
 import time
+import gzip
 
 # (scheme, host, port): socket
 connections = {}
@@ -73,8 +74,10 @@ class URL:
                 content = f.read()
             return content
         
-        if cache.get((self.scheme, self.host, self.port)):
-            content, max_age, cache_time = cache.get((self.scheme, self.host, self.port))
+        key = (self.scheme, self.host, self.port)
+
+        if key in cache:
+            content, max_age, cache_time = cache.get(key)
 
             if max_age == "-1":
                 return content
@@ -88,7 +91,6 @@ class URL:
                 print("Cache hit")
                 return content
         
-        key = (self.scheme, self.host, self.port)
         if key in connections:
             s = connections[key]
         else:
@@ -110,10 +112,12 @@ class URL:
         # HOST: example.org
         # Connection: keep-alive
         # User-Agent: demo-browser
+        # Accept-Encoding: gzip
         request = "GET {} HTTP/1.1\r\n".format(self.path)
         request += "HOST: {}\r\n".format(self.host)
         request += "Connection: {}\r\n".format("keep-alive")
         request += "User-Agent: {}\r\n".format("demo-browser")
+        request += "Accept-Encoding: {}\r\n".format("gzip")
         request += "\r\n"
 
         s.send(request.encode("utf8"))
@@ -144,7 +148,7 @@ class URL:
             header, value = line.split(":", 1)
             response_headers[header.casefold()] = value.strip()
         
-        assert "content-encoding" not in response_headers
+        # assert "content-encoding" not in response_headers
 
         cache_control_directives = {}
         if "cache-control" in response_headers:
@@ -176,7 +180,7 @@ class URL:
         if transfer_encoding == "chunked":
             body = b""
             while True:
-                line = response.readline().decode("utf-8").strip()
+                line = response.readline().strip()
                 chunk_size = int(line, 16)
                 
                 if chunk_size == 0:
@@ -197,6 +201,10 @@ class URL:
         if connection_header == "close":
             s.close()
             connections.pop(key, None)
+        
+        content_encoding = response_headers.get("content-encoding", "").lower() 
+        if content_encoding == "gzip":
+            content = gzip.decompress(content)
         
         content = content.decode("utf-8")
 
