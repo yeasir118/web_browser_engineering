@@ -214,11 +214,13 @@ class URL:
 
         return content
     
-def show(body, view_source=False):
+def lex(body, view_source=False):
+    text = ""
+
     if view_source is True:
         for c in body:
-            print(c, end="")
-        return
+            text += c
+        return text
 
     in_tag = False
     i = 0
@@ -243,25 +245,28 @@ def show(body, view_source=False):
                 content += ";"
 
                 if content == "&lt;":
-                    print("<", end="")
+                    text += "<"
                 elif content == "&gt;":
-                    print(">", end="")
+                    text += ">"
                 else:
-                    print(content, end="")
+                    text += content
                 
                 i = j + 1
             else:
-                print(c, end="")
+                text += c
                 i += 1
         elif not in_tag:
-            print(c, end="")
+            text += c
             i += 1
         else:
             i += 1
+    
+    return text
 
 def load(url):
     body = url.request()
-    show(body, url.view_source)
+    text = lex(body, url.view_source)
+    print(text)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
