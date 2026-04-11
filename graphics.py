@@ -32,8 +32,9 @@ class Browser:
             self.draw()
     
     def draw(self):
+        screen_display_list = [item for item in self.display_list if (item[1] >= (VSTEP * (self.scroll_y_index + 1))) and (item[1] < (VSTEP * (self.scroll_y_index + self.lines_per_screen)))]
         self.canvas.delete("all")
-        for x, y, c in self.display_list:
+        for x, y, c in screen_display_list:
             self.canvas.create_text(x, y - (VSTEP * (self.scroll_y_index)), text=c)
 
     def load(self, url):
