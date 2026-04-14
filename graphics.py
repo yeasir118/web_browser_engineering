@@ -117,14 +117,18 @@ class Browser:
                     cursor_x = HSTEP
                     cursor_y += VSTEP
         else:
+            text_list = self.text.split(" ")
             cursor_x, cursor_y = self.width - self.scrollbarWidth - self.rightAlignedContentOffset, VSTEP
-            for c in self.text:
-                display_list.append((cursor_x, cursor_y, c))
-                cursor_x -= HSTEP
+            
+            for str in text_list:
+                str = str[::-1]
+                for c in str:
+                    display_list.append((cursor_x, cursor_y, c))
+                    cursor_x -= HSTEP
 
-                if cursor_x - HSTEP <= 0:
-                    cursor_x = self.width - self.scrollbarWidth - self.rightAlignedContentOffset
-                    cursor_y += VSTEP
+                    if cursor_x - HSTEP <= 0:
+                        cursor_x = self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+                        cursor_y += VSTEP
         
         full_length = display_list[-1][1] if display_list else self.height
         self.scrollbarMiniHeight = (self.height * self.height) / full_length
@@ -136,6 +140,14 @@ class Browser:
         self.scrollbarMiniScrollStep = (self.height - self.scrollbarMiniHeight) / totalScrolls   
 
         return display_list
+
+def reverse_words(text):
+    text_list = text.split()
+    for str in text_list:
+        for c in str:
+            print(c, end=" ")
+        print("\n")
+
 
 def main():
     parser = argparse.ArgumentParser(description="A simple browser with command line arguments")
