@@ -1,4 +1,4 @@
-import tkinter
+import tkinter as tk
 import math
 import argparse
 from url import URL, lex
@@ -22,19 +22,19 @@ class Browser:
         self.scrollbarWidth = SCROLL_BAR_WIDTH
         self.scrollbarOffset = SCROLL_BAR_OFFSET
 
-        self.window = tkinter.Tk()
+        self.window = tk.Tk()
 
         self.window.bind("<Configure>", self.resize_handler)
         self.window.bind("<Down>", self.scrolldown) 
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<MouseWheel>", self.mouseScroll)
 
-        self.canvas = tkinter.Canvas(
+        self.canvas = tk.Canvas(
             self.window,
             width=self.width,
             height=self.height
         )
-        self.canvas.pack(fill=tkinter.BOTH, expand=True)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self.scroll = 0
     
@@ -166,7 +166,7 @@ def main():
     browser = Browser(reverse=args.reverse)
     browser.load(args.url)
 
-    tkinter.mainloop()
+    tk.mainloop()
 
 if __name__ == "__main__":
     main()
