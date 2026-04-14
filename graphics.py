@@ -107,28 +107,33 @@ class Browser:
         
         display_list = []
 
-        if self.reverse is False:
-            cursor_x, cursor_y = HSTEP, VSTEP
-            for c in self.text:
+        words = self.text.split(" ")
+        cursor_x = HSTEP if not self.reverse else self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+        cursor_y = VSTEP
+        step_sign = 1 if not self.reverse else -1
+
+        for word in words:
+            word = word[::-1] if self.reverse else word
+
+            # word wrapping
+            word_length = len(word) * HSTEP
+            if (not self.reverse and cursor_x + word_length >= self.width - self.scrollbarWidth) \
+                or (self.reverse and cursor_x - word_length <= 0):
+                cursor_x = HSTEP if not self.reverse else self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+                cursor_y += VSTEP
+
+            for c in word:
                 display_list.append((cursor_x, cursor_y, c))
-                cursor_x += HSTEP
+                cursor_x += (HSTEP * step_sign)
 
-                if cursor_x + HSTEP >= self.width - self.scrollbarWidth:
-                    cursor_x = HSTEP
-                    cursor_y += VSTEP
-        else:
-            text_list = self.text.split(" ")
-            cursor_x, cursor_y = self.width - self.scrollbarWidth - self.rightAlignedContentOffset, VSTEP
+                # sentence wrapping
+                # NOT NEEDED if word wrapping is present
+                # if (not self.reverse and cursor_x + HSTEP >= self.width - self.scrollbarWidth) \
+                # or (self.reverse and cursor_x - HSTEP <= 0):
+                #     cursor_x = HSTEP if not self.reverse else self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+                #     cursor_y += VSTEP
             
-            for str in text_list:
-                str = str[::-1]
-                for c in str:
-                    display_list.append((cursor_x, cursor_y, c))
-                    cursor_x -= HSTEP
-
-                    if cursor_x - HSTEP <= 0:
-                        cursor_x = self.width - self.scrollbarWidth - self.rightAlignedContentOffset
-                        cursor_y += VSTEP
+            display_list.append((cursor_x, cursor_y, " "))
         
         full_length = display_list[-1][1] if display_list else self.height
         self.scrollbarMiniHeight = (self.height * self.height) / full_length
