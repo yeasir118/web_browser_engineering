@@ -127,11 +127,12 @@ class Browser:
                 cursor_x += (HSTEP * step_sign)
 
                 # sentence wrapping
-                # NOT NEEDED if word wrapping is present
-                # if (not self.reverse and cursor_x + HSTEP >= self.width - self.scrollbarWidth) \
-                # or (self.reverse and cursor_x - HSTEP <= 0):
-                #     cursor_x = HSTEP if not self.reverse else self.width - self.scrollbarWidth - self.rightAlignedContentOffset
-                #     cursor_y += VSTEP
+                # NOT NEEDED for English IF word wrapping is present
+                # NEEDED for other languages EVEN IF word wrapping is present(like Chinese) where there are no word spacings 
+                if (not self.reverse and cursor_x + HSTEP >= self.width - self.scrollbarWidth) \
+                or (self.reverse and cursor_x - HSTEP <= 0):
+                    cursor_x = HSTEP if not self.reverse else self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+                    cursor_y += VSTEP
             
             display_list.append((cursor_x, cursor_y, " "))
         
