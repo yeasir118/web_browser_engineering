@@ -1,64 +1,154 @@
 import tkinter
+import math
+import argparse
 from url import URL, lex
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
+SCROLL_BAR_WIDTH = 15
+SCROLL_BAR_OFFSET = 2
+RIGHT_ALIGNED_CONTENT_OFFSET = 9
 
 class Browser:
-    def __init__(self):
+    def __init__(self, reverse=False):
+        self.width = WIDTH
+        self.height = HEIGHT
+
+        self.reverse = reverse
+        self.rightAlignedContentOffset = RIGHT_ALIGNED_CONTENT_OFFSET
+
+        self.scrollStep = SCROLL_STEP
+        self.scrollbarWidth = SCROLL_BAR_WIDTH
+        self.scrollbarOffset = SCROLL_BAR_OFFSET
+
         self.window = tkinter.Tk()
 
-        self.window.bind("<Down>", self.on_down_key)
-        self.window.bind("<Up>", self.on_up_key)
+        self.window.bind("<Configure>", self.resize_handler)
+        self.window.bind("<Down>", self.scrolldown) 
+        self.window.bind("<Up>", self.scrollup)
+        self.window.bind("<MouseWheel>", self.mouseScroll)
 
         self.canvas = tkinter.Canvas(
             self.window,
-            width=WIDTH,
-            height=HEIGHT
+            width=self.width,
+            height=self.height
         )
-        self.canvas.pack()
+        self.canvas.pack(fill=tkinter.BOTH, expand=True)
 
-        self.scroll_y_index = 0
-        self.lines_per_screen = int(HEIGHT / VSTEP)
+        self.scroll = 0
     
-    def on_down_key(self, event):
-        if self.scroll_y_index + self.lines_per_screen <= self.scroll_y_max_index:
-            self.scroll_y_index += 1
+    def resize_handler(self, event):
+        self.width = event.width
+        self.height = event.height
+
+        self.display_list = self.layout()
+        self.draw()
+    
+    def mouseScroll(self, e):
+        full_length = self.display_list[-1][1] if self.display_list else self.height
+        if e.delta == -120 and self.scroll + self.height < full_length:
+            self.scroll += self.scrollStep
+            self.draw()
+        elif e.delta == 120 and self.scroll > 0:
+            self.scroll -= self.scrollStep
             self.draw()
     
-    def on_up_key(self, event):
-        if self.scroll_y_index > 0:
-            self.scroll_y_index -= 1
-            self.draw()
+    def scrolldown(self, e):
+        full_length = self.display_list[-1][1] if self.display_list else self.height
+        if self.scroll + self.height < full_length:
+            self.scroll += self.scrollStep
+        self.draw()
+    
+    def scrollup(self, e):
+        if self.scroll > 0:
+            self.scroll -= self.scrollStep
+        self.draw()
+    
+    def drawScrollBarMini(self):
+        top = (self.scroll / self.scrollStep) * self.scrollbarMiniScrollStep
+        self.canvas.create_rectangle(self.width - self.scrollbarWidth + self.scrollbarOffset, top, self.width - self.scrollbarOffset, top + self.scrollbarMiniHeight)
+    
+    def drawScrollBar(self):
+        self.canvas.create_rectangle(self.width - self.scrollbarWidth, 0, self.width, self.height)
     
     def draw(self):
-        screen_display_list = [item for item in self.display_list if (item[1] >= (VSTEP * (self.scroll_y_index + 1))) and (item[1] < (VSTEP * (self.scroll_y_index + self.lines_per_screen)))]
+        if not self.display_list:
+            self.canvas.create_rectangle(0, 0, self.width, self.height)
+            return
         self.canvas.delete("all")
-        for x, y, c in screen_display_list:
-            self.canvas.create_text(x, y - (VSTEP * (self.scroll_y_index)), text=c)
+        self.drawScrollBar()
+        self.drawScrollBarMini()
+        for x, y, c in self.display_list:
+            if y > self.scroll + self.height: continue
+            if y + VSTEP < self.scroll: continue
 
-    def load(self, url):
-        text = lex(url.request())
-        
-        self.display_list = layout(text)
-        self.scroll_y_max_index = int(self.display_list[-1][1] / VSTEP) - 1 
+            self.canvas.create_text(x, y - self.scroll, text=c)
 
+    def load(self, url_text):
+        try:
+            url = URL(url_text)
+            body = url.request()
+            self.text = lex(body)
+        except:
+            print(f"Error loading the url: {url_text}")
+            self.text = ""
+            self.display_list = []
+            self.draw()
+            return
+        self.display_list = self.layout()
         self.draw()
         
-def layout(text):
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-
-        if cursor_x + HSTEP >= WIDTH:
-            cursor_x = HSTEP
-            cursor_y += VSTEP
+    def layout(self):
+        if not self.text:
+            self.scrollbarMiniHeight = self.height
+            self.scrollbarMiniScrollStep = 0
+            return []
         
-    return display_list
+        display_list = []
+
+        if self.reverse is False:
+            cursor_x, cursor_y = HSTEP, VSTEP
+            for c in self.text:
+                display_list.append((cursor_x, cursor_y, c))
+                cursor_x += HSTEP
+
+                if cursor_x + HSTEP >= self.width - self.scrollbarWidth:
+                    cursor_x = HSTEP
+                    cursor_y += VSTEP
+        else:
+            cursor_x, cursor_y = self.width - self.scrollbarWidth - self.rightAlignedContentOffset, VSTEP
+            for c in self.text:
+                display_list.append((cursor_x, cursor_y, c))
+                cursor_x -= HSTEP
+
+                if cursor_x - HSTEP <= 0:
+                    cursor_x = self.width - self.scrollbarWidth - self.rightAlignedContentOffset
+                    cursor_y += VSTEP
+        
+        full_length = display_list[-1][1] if display_list else self.height
+        self.scrollbarMiniHeight = (self.height * self.height) / full_length
+        
+        if not display_list or full_length <= self.height:
+            totalScrolls = 1
+        else:
+            totalScrolls = math.ceil(((full_length - self.height) / self.scrollStep))
+        self.scrollbarMiniScrollStep = (self.height - self.scrollbarMiniHeight) / totalScrolls   
+
+        return display_list
+
+def main():
+    parser = argparse.ArgumentParser(description="A simple browser with command line arguments")
+
+    parser.add_argument("-r", "--reverse", action="store_true", help="Reverse the content of the page")
+    parser.add_argument("url", type=str, help="The URL to load (e.g., http://example.com)")
+
+    args = parser.parse_args()
+
+    browser = Browser(reverse=args.reverse)
+    browser.load(args.url)
+
+    tkinter.mainloop()
 
 if __name__ == "__main__":
-    import sys
-    Browser().load(URL(sys.argv[1]))
-    tkinter.mainloop()
+    main()
